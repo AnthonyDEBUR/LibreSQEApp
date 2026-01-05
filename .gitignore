@@ -1,5 +1,43 @@
-.Rproj.user
+# Ignorer le dossier yaml
+yaml/
+
+# Fichiers et dossiers spécifiques à RStudio
+.Rproj.user/
 .Rhistory
 .RData
 .Ruserdata
-yaml/
+
+# Fichiers de projet RStudio
+*.Rproj
+
+# Fichiers temporaires
+*.Rout
+*.Rout.save
+*.Rout.fail
+*.Rapp.history
+
+# Fichiers de cache et logs
+*.log
+*.tmp
+*.swp
+
+# Dossiers de cache Shiny
+rsconnect/
+packrat/
+renv/
+
+# Fichiers générés par Shiny ou RMarkdown
+*.html
+*.pdf
+*.docx
+*.pptx
+
+# Données sensibles ou volumineuses
+data/
+*.csv
+*.xlsx
+*.txt
+
+# Ignorer les fichiers système
+.DS_Store
+Thumbs.db
