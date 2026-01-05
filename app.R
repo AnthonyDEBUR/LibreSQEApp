@@ -1,7 +1,7 @@
 # Liste des packages CRAN nécessaires
 cran_packages <- c("shiny", "leaflet", "lubridate", "dplyr", "yaml",
                    "RPostgres", "DBI", "sf", "DT", "readxl", "tidyverse",
-                   "pool")
+                   "pool", "bslib")
 
 # Fonction pour installer les packages CRAN manquants
 install_if_missing <- function(pkg) {
@@ -58,8 +58,22 @@ onStop(function() {
 
 
 ##### Chargement des modules #####
+# MARCHES - gestion des marchés
+source("modules/mod_edition_marche_ui.R", local = TRUE)
+source("modules/mod_edition_marche_server.R", local = TRUE)
+
+# MARCHES - Import BPU & Programmes types
+source("modules/mod_import_bpu_progtypes_ui.R",     local = TRUE)
+source("modules/mod_import_bpu_progtypes_server.R", local = TRUE)
+
+
+# REFERENTIELS
 source("modules/mod_maj_referentiels_sandre.R", local = TRUE)
 source("modules/mod_station_view.R", local = TRUE)
+
+# REFERENTIELS - prestataires
+source("modules/mod_prestataires_ui.R", local = TRUE)
+source("modules/mod_prestataires_server.R", local = TRUE)
 
 
 
@@ -551,45 +565,11 @@ ui <- navbarPage(
       p(
         "Edition accessible seulement aux administrateurs. Pour les autres on ne peut que visualiser"
       ),
-      textInput("nom_nouveau_marche", label = "Nom du marché"),
-      textInput("code_nouveau_marche", label = "Référence du marché (ex. 2022-65)"),
-      dateInput("date_debut_nouveau_marche", label = "Date début validité du marché"),
-      dateInput("date_fin_nouveau_marche", label = "Date fin de validité du marché"),
-      selectInput(
-        "prestataire_marche",
-        "Titulaire du marché",
-        choices = c("Liste des intervenants", "Intervenant 1", "Intervenant 2", "...")
-      ),
-      p(
-        "Ajouter tableau avec la liste des marchés en cours, leur titulaire, ..."
-      )
+      mod_edition_marche_ui("marche")
     ),
     tabPanel(
       "Importer BPU et programmes types",
-      p(
-        "Edition accessible seulement aux administrateurs. Pour les autres on ne peut que visualiser"
-      ),
-      p(
-        "le BPU comporte 3 onglets Excel : un avec le prix unitaire de chaque prestation,
-               un avec le cout de chaque run analytique et un avec les programmes types"
-      ),
-      selectInput(
-        "select_marche_prog_annuelle_a_importer",
-        "Sélectionnez le marché concerné",
-        choices = c(
-          "Marché labo n°1 - 2022",
-          "Marché labo n°2 - 2022",
-          "Marché labo n°1 - 2023-2025",
-          "Marché labo n°3 - 2023"
-        )
-      ),
-      fileInput("import_bpu",
-                label = "Importer fichier xlsx bpu_prog_type"),
-      actionButton("btn_import_bpu", "Importer le fichier sélectionné"),
-      p(
-        "une fois importé faire un rapport d'import qui indique si le fichier
-               a bien été importé ou bien, s'il n'est pas conforme, les raisons de sa non conformité."
-      )
+      mod_import_bpu_progtypes_ui("import_marche")
     ),
     tabPanel(
       "Modifier BPU",
@@ -820,13 +800,9 @@ ui <- navbarPage(
     ),
     tabPanel(
       "Rôles des intervenants",
-      p(
-        "Page visible uniquement si la personne connectée a le statut administrateur de marché."
-      ),
-      h1("Tableau des intervenants sur le marché"),
-      p("Possibilité de définir les labos et les préleveurs")
+      prestatairesUI("prestataires")
     )
-  ),
+   ),
   tabPanel(
     "Connexion",
     textInput("identifiant", "Saisir votre identifiant"),
@@ -852,10 +828,40 @@ server <- function(input, output) {
 
     
   
+  ##### MARCHES #####
+  
+  mod_edition_marche_server(
+    id = "marche",
+    pool = connexion,
+    schema_sqe   = "sqe",
+    table_mar    = "t_marche_mar",
+    schema_refer = "refer",
+    table_presta = "tr_prestataire_pre",
+    presta_id    = "pre_id",    # adapte si différent
+    presta_label = "pre_nom",   # adapte si différent
+    allow_multi  = FALSE,        # TRUE pour autoriser multi-titulaires dans l'UI
+    pivot_table  = NULL         # mets par ex. "sqe.t_marche_titulaires" si tu as une table pivot (mar_id, pre_id)
+  )
+  
+  
+  
+  
+  mod_import_bpu_progtypes_server(
+    id           = "import_marche",
+    pool         = connexion,
+    schema_sqe   = "sqe",
+    can_edit     = TRUE, # authentification avec utilisateur autorisé à éditer les BPU
+    auto_on_valid = TRUE  # TRUE = import auto si conforme et base vide
+  )
+  
+
+  
   ##### REFERENTIELS #####
   
   majrefSANDRE_server("majrefs", connexion) # referentiels SANDRE
   stationViewServer("station", con = connexion, crs_xy = 2154)  # FICHE STATION
+  prestatairesServer("prestataires", pool = connexion) # prestataires
+  
   
 }
 

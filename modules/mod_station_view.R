@@ -19,19 +19,13 @@ stationViewUI <- function(id) {
             openOnFocus = TRUE
           )
         )
-      ),
-      shiny::column(
-        width = 4,
-        # Champ de recherche libre (code OU nom) + bouton
-        shiny::textInput(ns("station_search"), "Recherche code/nom", value = ""),
-        shiny::actionButton(ns("do_search"), "Rechercher", icon = shiny::icon("search"))
       )
     ),
     
     shiny::tags$hr(),
     shiny::h3("Carte de localisation"),
     shiny::helpText("Localisation selon SANDRE (geom si disponible) ou coordonnées X/Y."),
-    leaflet::leafletOutput(ns("map"), height = 420),
+    leaflet::leafletOutput(ns("map"), height = 800),
     
     # Squelettes d'autres sections du prototype (placeholders)
     shiny::tags$hr(),
@@ -111,33 +105,7 @@ ORDER BY stm_cdstationmesureinterne;
       )
     })
     
-    # --- Recherche libre (code/nom) ------------------------------------------
-    shiny::observeEvent(input$do_search, {
-      query <- trimws(input$station_search)
-      df <- stations()
-      shiny::req(nrow(df) > 0)
-      
-      if (nzchar(query)) {
-        idx <- which(
-          grepl(query, df$stm_cdstationmesureinterne, ignore.case = TRUE) |
-            grepl(query, df$stm_lbstationmesureeauxsurface, ignore.case = TRUE)
-        )
-        labels <- paste0(df$stm_cdstationmesureinterne[idx], " - ", df$stm_lbstationmesureeauxsurface[idx])
-        choices <- stats::setNames(df$stm_cdstationmesureinterne[idx], labels)
-        
-        shiny::updateSelectizeInput(session, "station_sel",
-                                    choices = choices,
-                                    selected = if (length(idx) == 1) df$stm_cdstationmesureinterne[idx] else NULL
-        )
-      } else {
-        # Réinitialiser la liste complète
-        labels <- paste0(df$stm_cdstationmesureinterne, " - ", df$stm_lbstationmesureeauxsurface)
-        choices <- stats::setNames(df$stm_cdstationmesureinterne, labels)
-        shiny::updateSelectizeInput(session, "station_sel",
-                                    choices = choices, selected = NULL
-        )
-      }
-    }, ignoreInit = TRUE)
+   
     
     # --- Carte Leaflet --------------------------------------------------------
     
