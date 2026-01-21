@@ -1,7 +1,7 @@
 # Liste des packages CRAN nécessaires
 cran_packages <- c("shiny", "leaflet", "lubridate", "dplyr", "yaml",
                    "RPostgres", "DBI", "sf", "DT", "readxl", "tidyverse",
-                   "pool", "bslib")
+                   "pool", "bslib", "shinyjs")
 
 # Fonction pour installer les packages CRAN manquants
 install_if_missing <- function(pkg) {
@@ -66,6 +66,15 @@ source("modules/mod_edition_marche_server.R", local = TRUE)
 source("modules/mod_import_bpu_progtypes_ui.R",     local = TRUE)
 source("modules/mod_import_bpu_progtypes_server.R", local = TRUE)
 
+# MARCHES - Import prog annuelle
+source("modules/mod_import_prog_annuelle_ui.R", local = TRUE)
+source("modules/mod_import_prog_annuelle_server.R", local = TRUE)
+
+# MARCHES - fusionner bons de commandes
+source("modules/mod_fusion_bdc_ui.R",     local = TRUE)
+source("modules/mod_fusion_bdc_server.R", local = TRUE)
+
+
 
 # REFERENTIELS
 source("modules/mod_maj_referentiels_sandre.R", local = TRUE)
@@ -75,6 +84,9 @@ source("modules/mod_station_view.R", local = TRUE)
 source("modules/mod_prestataires_ui.R", local = TRUE)
 source("modules/mod_prestataires_server.R", local = TRUE)
 
+# REFERENTIELS - PERIMETRES DE GESTION
+source("modules/mod_perimetres_ui.R",     local = TRUE)
+source("modules/mod_perimetres_server.R", local = TRUE)
 
 
 
@@ -89,9 +101,6 @@ fichier_prog <-
   "C:\\Users\\anthony.deburghrave\\OneDrive - EPTB Vilaine\\Documents\\R_Anthony\\libreSQE\\dev\\v2 prog EPTB Est_Ouest 2022 - commande_3 derniers trimestres_ajout suivis Captages_version dev libreSQE.xlsx"
 
 
-# param_perimetre_facturation <- "UGVE"
-# param_rattachement_bdc <- "pluie"
-# param_mois <- "aout"
 
 prog_annuelle <- read_xlsx(fichier_prog,
                            sheet = "programme_annuel",
@@ -148,6 +157,7 @@ tableau_maj_ref <-
 # Define UI for application that draws a histogram
 ui <- navbarPage(
   title=div(img(src="favicon.ico"), "Prototype de l'interface de libreSQE"),
+  shinyjs::useShinyjs(),
   theme = bslib::bs_theme(
     version = 5,
     primary = "#00218f",
@@ -179,6 +189,7 @@ ui <- navbarPage(
                      "Marché labo n°3 - 2023"
                    )
                  ),
+                 actionButton("test_show", "Test show"),
                  selectInput(
                    "select_bdc",
                    "Sélectionnez le bon de commande concerné",
@@ -218,12 +229,13 @@ ui <- navbarPage(
                column(
                  8,
                  DTOutput("dt_analyses_a_qualifier"),
+                 
                  actionButton(
-                   "btn_valide_selection",
+                   "analyses_btn_valide_selection_1",
                    "Valider l'ensemble des données affichées"
                  ),
                  actionButton(
-                   "btn_invalide_selection",
+                   "analyses_btn_invalide_selection_1",
                    "Invalider l'ensemble des données affichées"
                  ),
                  p(
@@ -270,11 +282,11 @@ ui <- navbarPage(
                    "possibilité d'éditer certaines valeurs (résultat d'analyses, LQ, LD, code unité, ... dans le DT)"
                  ),
                  actionButton(
-                   "btn_valide_selection",
+                   "btn_valide_selection_2",
                    "Valider l'ensemble des données affichées"
                  ),
                  actionButton(
-                   "btn_invalide_selection",
+                   "btn_invalide_selection_2",
                    "Invalider l'ensemble des données affichées"
                  ),
                  p(
@@ -309,7 +321,7 @@ ui <- navbarPage(
     tabPanel(
       "Déposer un fichier xml / QUESU / EDILABO",
       selectInput(
-        "select_bdc",
+        "livr_select_bdc_1",
         "Sélectionnez le bon de commande concerné",
         choices = c(
           "2022-3_UGVO_pluie_avril_2022",
@@ -335,7 +347,7 @@ ui <- navbarPage(
         choices = c(unique(prog_previsionnelle$rattachement_devis))
       ),
       selectInput(
-        "select_perimetre_fact",
+        "livr_select_perimetre_fact",
         "provisoire : perimetre facturation",
         choices = c(unique(
           prog_previsionnelle$perimetre_facturation
@@ -353,7 +365,7 @@ ui <- navbarPage(
     tabPanel(
       "Rapport de dépôt",
       selectInput(
-        "select_bdc",
+        "livr_select_bdc_2",
         "Sélectionnez le bon de commande concerné",
         choices = c(
           "2022-3_UGVO_pluie_avril_2022",
@@ -361,7 +373,7 @@ ui <- navbarPage(
         )
       ),
       selectInput(
-        "select_depot",
+        "livr_select_depot",
         "Sélectionnez le dépôt concerné",
         choices = c("2022-12-01_dépôt1_carso")
       ),
@@ -424,7 +436,7 @@ ui <- navbarPage(
     tabPanel(
       "Créer / éditer un bon de commande / émettre fichier EDILABO",
       selectInput(
-        "select_marche_prog_annuelle_a_importer",
+        "cmd_select_marche_prog_annuelle_a_importer",
         "Sélectionnez le marché concerné",
         choices = c(
           "Marché labo n°1 - 2022",
@@ -434,7 +446,7 @@ ui <- navbarPage(
         )
       ),
       selectInput(
-        "select_perimetre_fact",
+        "cmd_select_perimetre_fact",
         "Sélectionnez le périmètre de facturation concerné",
         choices = c("UGVO",
                     "UGVE",
@@ -513,7 +525,7 @@ ui <- navbarPage(
     tabPanel(
       "Avancement du bon de commande / facturation",
       selectInput(
-        "select_marche_prog_annuelle_a_importer",
+        "cmd_select_marche_avancement",
         "Sélectionnez le marché concerné",
         choices = c(
           "Marché labo n°1 - 2022",
@@ -526,7 +538,7 @@ ui <- navbarPage(
         "les choix du sélecteur de bon de commande affiche déjà les bdc non clôs puis ceux programmés et enfin ceux clôs "
       ),
       selectInput(
-        "select_marche_bdc_a_importer",
+        "cmd_select_bdc_avancement",
         "Sélectionnez le bon de commande concerné",
         choices = c(
           "UGVE - Pont-Billon - Pluie - août 2022 (en cours)",
@@ -577,7 +589,7 @@ ui <- navbarPage(
         "Edition accessible seulement aux administrateurs. Pour les autres on ne peut que visualiser"
       ),
       selectInput(
-        "select_marche_bpu_a_editer",
+        "select_marche_bpu_a_editer_10",
         "Sélectionnez le marché concerné",
         choices = c(
           "Marché labo n°1 - 2022",
@@ -587,7 +599,7 @@ ui <- navbarPage(
         )
       ),
       selectInput(
-        "select_annee_bpu_a_editer",
+        "select_annee_bpu_a_editer_10",
         "Sélectionnez l'année concernée (choix parmi les années entre le début et la fin du marché)",
         choices = c("2022")
       ),
@@ -600,32 +612,10 @@ ui <- navbarPage(
       DTOutput("DT_bpu_run_analytiques"),
       DTOutput("DT_prog_types")
     ),
+    
     tabPanel(
       "Importer programmation annuelle",
-      p(
-        "Edition accessible seulement aux administrateurs. Pour les autres on ne peut que visualiser"
-      ),
-      p(
-        "la programmation annuelle comporte 2 onglets Excel : un avec la liste des stations et le code de leur programme annuel,
-               et un avec le code des programmes annueles et les prestations et dates d'intervention correspondant"
-      ),
-      selectInput(
-        "select_marche_prog_annuelle_a_importer",
-        "Sélectionnez le marché concerné",
-        choices = c(
-          "Marché labo n°1 - 2022",
-          "Marché labo n°2 - 2022",
-          "Marché labo n°1 - 2023-2025",
-          "Marché labo n°3 - 2023"
-        )
-      ),
-      fileInput("import_pgm_annuelle",
-                label = "Importer fichier xlsx programmation annuelle"),
-      actionButton("btn_import_pgm_annuelle", "Importer le fichier sélectionné"),
-      p(
-        "une fois importé faire un rapport d'import qui indique si le fichier
-               a bien été importé ou bien, s'il n'est pas conforme, les raisons de sa non conformité."
-      )
+      mod_import_prog_annuelle_ui("import_pgm_annuelle")
     ),
     tabPanel(
       "Editer programmation annuelle",
@@ -633,7 +623,7 @@ ui <- navbarPage(
         "Edition accessible seulement aux administrateurs. Pour les autres on ne peut que visualiser"
       ),
       selectInput(
-        "select_marche_prog_annuelle_a_editer",
+        "select_marche_prog_annuelle_a_editer_11",
         "Sélectionnez le marché concerné",
         choices = c(
           "Marché labo n°1 - 2022",
@@ -643,7 +633,7 @@ ui <- navbarPage(
         )
       ),
       selectInput(
-        "select_annee_prog_a_editer",
+        "select_annee_prog_a_editer_11",
         "Sélectionnez l'année concernée (choix parmi les années entre le début et la fin du marché)",
         choices = c("2022")
       ),
@@ -652,9 +642,13 @@ ui <- navbarPage(
       DTOutput("DT_prog_annuelle_programmation")
     ),
     tabPanel(
+      "Fusionner des bons de commandes",
+      mod_fusion_bdc_ui("fusion_bdc")
+    ),
+    tabPanel(
       "Avancement du marché",
       selectInput(
-        "select_marche_avancement",
+        "select_marche_avancement_12",
         "Sélectionnez le marché concerné",
         choices = c(
           "Marché labo n°1 - 2022",
@@ -675,7 +669,7 @@ ui <- navbarPage(
     tabPanel(
       "Editer un jeu de fiches stations",
       selectInput(
-        "select_marche_fiches_stations",
+        "select_marche_fiches_stations_13",
         "Sélectionnez le marché concerné",
         choices = c(
           "Marché labo n°1 - 2022",
@@ -685,7 +679,7 @@ ui <- navbarPage(
         )
       ),
       selectizeInput(
-        "select_liste_stations_marche",
+        "select_liste_stations_marche_14",
         "Liste des stations dont il faut éditer les fiches (choix parmi celles du marché actif)",
         choices = c(
           "Station 1 du marché actif",
@@ -696,15 +690,15 @@ ui <- navbarPage(
         multiple = TRUE
       ),
       actionButton(
-        "select_liste_stations_marche_all",
+        "select_liste_stations_marche_all_1",
         "Sélectionner toutes les stations du marché"
       ),
       actionButton(
-        "generer_fiche_stations_de_la_liste",
+        "generer_fiche_stations_de_la_liste_2",
         "Générer les fiches des stations sélectionnées en pdf (1 pdf par station)"
       ),
       actionButton(
-        "generer_fiche_stations_de_la_liste_tout_1_coup",
+        "generer_fiche_stations_de_la_liste_tout_1_coup_3",
         "Générer les fiches des stations sélectionnées en pdf (1 pdf pour ensemble des stations)"
       )
       
@@ -723,28 +717,28 @@ ui <- navbarPage(
       h1("accès station"),
       verbatimTextOutput("text_acces_station"),
       actionButton(
-        "btn_editer_text_acces",
+        "btn_editer_text_acces_20",
         "Editer texte accès station",
         icon = icon("check")
       ),
       h1("Précisions sur prélèvement"),
       verbatimTextOutput("text_prelevement"),
       actionButton(
-        "btn_editer_prelevement",
+        "btn_editer_prelevement_21",
         "Editer précisions prélèvement",
         icon = icon("check")
       ),
       h1("Commentaires généraux sur la station"),
       verbatimTextOutput("text_commentaire_station"),
       actionButton(
-        "btn_editer_commentaires",
+        "btn_editer_commentaires_22",
         "Editer commentaires",
         icon = icon("check")
       ),
       h1("Photos"),
       p("1 photo + 1 légende par photo de la station"),
       actionButton(
-        "btn_ajout_rempl_photo",
+        "btn_ajout_rempl_photo_23",
         "ajouter/ remplacer photo",
         icon = icon("check")
       ),
@@ -771,32 +765,7 @@ ui <- navbarPage(
     ),
     tabPanel(
       "Périmètres de gestion",
-      tabPanel(
-        p(
-          "Page visible uniquement si la personne connectée a le statut administrateur de marché."
-        ),
-        h1("Périmètres de gestion"),
-        p(
-          "Prévoir d'ajouter à la table un statut du périmètre (actif / inactif).
-                 Seuls les périmètres actifs pourront être intégrés à un nouveau bon de commande."
-        ),
-        DTOutput("table_perimetres_de_gestion"),
-        actionButton(
-          "btn_maj_perimetre_gestion",
-          "Modifier un périmètre de gestion",
-          icon = icon("check")
-        ),
-        actionButton(
-          "btn_ajouter_per_gest",
-          "Ajouter un périmètre de gestion",
-          icon = icon("check")
-        ),
-        actionButton(
-          "btn_changer_statut_per_gest",
-          "Changer statut périmètre de gestion",
-          icon = icon("check")
-        ),
-      )
+      mod_perimetres_ui("perim")
     ),
     tabPanel(
       "Rôles des intervenants",
@@ -827,9 +796,11 @@ ui <- navbarPage(
 server <- function(input, output) {
 
     
+
+  
   
   ##### MARCHES #####
-  
+# edition des marchés  
   mod_edition_marche_server(
     id = "marche",
     pool = connexion,
@@ -843,9 +814,7 @@ server <- function(input, output) {
     pivot_table  = NULL         # mets par ex. "sqe.t_marche_titulaires" si tu as une table pivot (mar_id, pre_id)
   )
   
-  
-  
-  
+  # import des BPU et programmes types
   mod_import_bpu_progtypes_server(
     id           = "import_marche",
     pool         = connexion,
@@ -854,13 +823,37 @@ server <- function(input, output) {
     auto_on_valid = TRUE  # TRUE = import auto si conforme et base vide
   )
   
-
+  # import de la prog annuelle
+  mod_import_prog_annuelle_server(
+    id   = "import_pgm_annuelle",
+    pool = connexion,         # le pool déjà instancié dans l'app
+    schema_sqe = "sqe"
+  )
+  
+  # fusion de bdc
+    mod_fusion_bdc_server(
+    id   = "fusion_bdc",
+    pool = connexion,
+    schema_sqe = "sqe"
+  )
+  
   
   ##### REFERENTIELS #####
   
   majrefSANDRE_server("majrefs", connexion) # referentiels SANDRE
   stationViewServer("station", con = connexion, crs_xy = 2154)  # FICHE STATION
   prestatairesServer("prestataires", pool = connexion) # prestataires
+  
+  # périmètres de gestion
+  mod_perimetres_server(
+    id     = "perim",
+    pool   = connexion,
+    schema = "refer",
+    table  = "tr_perimetre_per",
+    id_col = "per_nom"  # clé primaire texte
+  )
+  
+  
   
   
 }
