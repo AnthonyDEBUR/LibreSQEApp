@@ -70,6 +70,11 @@ source("modules/mod_import_bpu_progtypes_server.R", local = TRUE)
 source("modules/mod_import_prog_annuelle_ui.R", local = TRUE)
 source("modules/mod_import_prog_annuelle_server.R", local = TRUE)
 
+# MARCHES - Editer prog annuelle
+source("modules/mod_editer_prog_annuelle_ui.R", local = TRUE)
+source("modules/mod_editer_prog_annuelle_server.R", local = TRUE)
+source("modules/mod_editer_prog_annuelle_diag.R", local = TRUE)
+
 # MARCHES - fusionner bons de commandes
 source("modules/mod_fusion_bdc_ui.R",     local = TRUE)
 source("modules/mod_fusion_bdc_server.R", local = TRUE)
@@ -619,27 +624,7 @@ ui <- navbarPage(
     ),
     tabPanel(
       "Editer programmation annuelle",
-      p(
-        "Edition accessible seulement aux administrateurs. Pour les autres on ne peut que visualiser"
-      ),
-      selectInput(
-        "select_marche_prog_annuelle_a_editer_11",
-        "Sélectionnez le marché concerné",
-        choices = c(
-          "Marché labo n°1 - 2022",
-          "Marché labo n°2 - 2022",
-          "Marché labo n°1 - 2023-2025",
-          "Marché labo n°3 - 2023"
-        )
-      ),
-      selectInput(
-        "select_annee_prog_a_editer_11",
-        "Sélectionnez l'année concernée (choix parmi les années entre le début et la fin du marché)",
-        choices = c("2022")
-      ),
-      p("Affichage de la prog annuelle"),
-      DTOutput("DT_prog_annuelle_stations"),
-      DTOutput("DT_prog_annuelle_programmation")
+      mod_editer_prog_annuelle_ui("edit_prog_annuelle")
     ),
     tabPanel(
       "Fusionner des bons de commandes",
@@ -797,8 +782,6 @@ server <- function(input, output) {
 
     
 
-  
-  
   ##### MARCHES #####
 # edition des marchés  
   mod_edition_marche_server(
@@ -830,6 +813,14 @@ server <- function(input, output) {
     schema_sqe = "sqe"
   )
   
+  # edition de la prog annuelle
+  mod_editer_prog_annuelle_server(
+    id = "edit_prog_annuelle",
+    pool = connexion,
+    schema_sqe = "sqe",
+    can_edit = TRUE  # à passer à FALSE si l'utilisateur n'est pas admin
+  )
+ 
   # fusion de bdc
     mod_fusion_bdc_server(
     id   = "fusion_bdc",

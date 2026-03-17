@@ -69,16 +69,21 @@ mod_import_prog_annuelle_ui <- function(id) {
         width = 9,
         
         tabsetPanel(
+          id = ns("tabs_principaux"),
+          tabPanel(
+            title = "Rapport de conformité",
+            value = "rapport_conf",
+            tags$pre(style="white-space: pre-wrap;",
+                     textOutput(ns("rapport_text")))
+          ),
           tabPanel("Prévisualisation - programme_annuel",
                    DT::DTOutput(ns("dt_prog_annuel"))),
           tabPanel("Prévisualisation - calendrier",
                    DT::DTOutput(ns("dt_calendrier"))),
           tabPanel("Données déjà en base (nb de lignes)",
                    DT::DTOutput(ns("dt_etat_base")),
-                   p(em("Données existantes pour le marché et l'année indiqués."))),
-          tabPanel("Rapport de conformité",
-                   tags$pre(style="white-space: pre-wrap;",
-                            textOutput(ns("rapport_text"))))
+                   p(em("Données existantes pour le marché et l'année indiqués.")))
+
         )
       )
     )

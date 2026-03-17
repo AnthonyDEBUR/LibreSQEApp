@@ -36,6 +36,7 @@ mod_fusion_bdc_ui <- function(id) {
       ),
       column(
         9,
+        h3("Fusionner des bons de commandes"),
         h4("Liste des bons de commandes"),
         p("Sélectionnez au moins deux lignes pour activer la fusion."),
         DT::DTOutput(ns("dt_bco"))

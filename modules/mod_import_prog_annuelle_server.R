@@ -120,7 +120,46 @@ mod_import_prog_annuelle_server <- function(id, pool, schema_sqe = "sqe") {
       extra_cal  <- setdiff(names(rv$cal),  c(REQ_CAL_OBL , REQ_CAL_OPT ))
       
       
+      # Début : création du vecteur de problèmes
       issues <- c()
+      
+      # --- Vérification stations manquantes dans le référentiel ----------------------
+      
+      # Récupération des codes internes station
+      prog_local <- rv$prog
+      prog_local$code_interne_station <- trimws(prog_local$code_interne_station)
+      need_fallback <- is.na(prog_local$code_interne_station) | prog_local$code_interne_station == ""
+      prog_local$code_interne_station[need_fallback] <- trimws(prog_local$code_sandre_station[need_fallback])
+      
+      # Neutralisation placeholders
+      placeholders <- c("sans_objet","sans objet","transport","TRANSPORT","", NA)
+      prog_local$code_interne_station[
+        prog_local$code_interne_station %in% placeholders
+      ] <- NA_character_
+      
+      sta_file <- unique(na.omit(prog_local$code_interne_station))
+      
+      # Récupération référentiel des stations
+      conn <- pool::poolCheckout(pool); on.exit(pool::poolReturn(conn))
+      sta_ref <- DBI::dbGetQuery(
+        conn,
+        glue::glue_sql("SELECT stm_cdstationmesureinterne FROM refer.tr_stationmesure_stm;", .con = conn)
+      )
+      
+      sta_missing <- setdiff(sta_file, sta_ref$stm_cdstationmesureinterne)
+      
+      if (length(sta_missing)) {
+        issues <- c(
+          issues,
+          paste0(
+            "Stations INTERNES absentes du référentiel (refer.tr_stationmesure_stm) : ",
+            paste(sta_missing, collapse=" ; ")
+          )
+        )
+      }
+      
+      
+      
       if (length(missing_prog)) issues <- c(
         issues, paste0("programme_annuel - colonnes manquantes : ", .join(missing_prog))
       )
@@ -173,6 +212,14 @@ mod_import_prog_annuelle_server <- function(id, pool, schema_sqe = "sqe") {
       
       rv$rapport <- paste(rapport_entete, rapport_contenu, rapport_datasets, sep = "\n\n")
       output$rapport_text <- renderText(rv$rapport)
+      
+      shinyjs::delay(50, {
+        updateTabsetPanel(
+          session,
+          inputId = ns("tabs_principaux"),
+          selected = "rapport_conf"
+        )
+      })
       
       if (!rv$conforme) return()
       
