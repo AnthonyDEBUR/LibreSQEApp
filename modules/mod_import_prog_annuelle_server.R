@@ -63,6 +63,9 @@ mod_import_prog_annuelle_server <- function(id, pool, schema_sqe = "sqe") {
       # Lecture brute (on laisse readxl inférer, tu peux forcer si besoin)
       rv$prog <- readxl::read_xlsx(rv$file_path, sheet = "programme_annuel")
       rv$cal  <- readxl::read_xlsx(rv$file_path, sheet = "calendrier")
+      rv$prog_types <- readxl::read_xlsx(rv$file_path, sheet = "programmes_types")
+      rv$bpu <- readxl::read_xlsx(rv$file_path, sheet = "BPU")
+      rv$programmes_sans_analyses<- readxl::read_xlsx(rv$file_path, sheet = "programmes_sans_analyses")
       
       # Cast des colonnes mois -> numeric (si présentes)
       mois <- c("janvier","fevrier","mars","avril","mai","juin",
@@ -123,6 +126,62 @@ mod_import_prog_annuelle_server <- function(id, pool, schema_sqe = "sqe") {
       # Début : création du vecteur de problèmes
       issues <- c()
       
+      # --- Vérification cohérence PROGRAMMES ------------------------------------
+      
+      # Programmes du calendrier
+      prog_cal <- unique(trimws(rv$cal$programme))
+      
+      # programmes sans analyses
+      prog_sans_analyses<-unique(rv$programmes_sans_analyses$programme)
+
+      
+      # Programmes dans programmes_types
+      if (!is.null(rv$prog_types) && "programme" %in% names(rv$prog_types)) {
+        prog_types <- unique(trimws(rv$prog_types$programme))
+      } else {
+        prog_types <- character(0)
+      }
+      
+      # Programmes dans BPU
+      if (!is.null(rv$bpu) && "label_prestation" %in% names(rv$bpu)) {
+        prog_bpu <- unique(trimws(rv$bpu$label_prestation))
+      } else {
+        prog_bpu <- character(0)
+      }
+      
+      # 1) Programmes du calendrier absents de programmes_types
+      missing_in_types <- setdiff(prog_cal, prog_types)
+      missing_in_types <- setdiff(missing_in_types, prog_sans_analyses)
+      
+      
+      if (length(missing_in_types) > 0) {
+        issues <- c(
+          issues,
+          paste0(
+            "Le(s) programme(s) suivant(s) sont présents dans l’onglet 'calendrier' ",
+            "mais absents de 'programmes_types' : ",
+            paste(missing_in_types, collapse = ", ")
+          )
+        )
+      }
+      
+      # 2) Programmes du calendrier absents du BPU (label_prestation)
+      missing_in_bpu <- setdiff(prog_cal, prog_bpu)
+      missing_in_bpu <- setdiff(missing_in_bpu, prog_sans_analyses)
+      
+      if (length(missing_in_bpu) > 0) {
+        issues <- c(
+          issues,
+          paste0(
+            "Le(s) programme(s) suivant(s) ne figurent pas dans la colonne ",
+            "'label_prestation' du BPU : ",
+            paste(missing_in_bpu, collapse = ", ")
+          )
+        )
+      }
+      
+
+      
       # --- Vérification stations manquantes dans le référentiel ----------------------
       
       # Récupération des codes internes station
@@ -181,6 +240,81 @@ mod_import_prog_annuelle_server <- function(id, pool, schema_sqe = "sqe") {
         issues <- c(issues, paste0(
           "calendrier - colonnes mois non numériques : ", .join(mois_non_numeriques)
         ))
+      }
+      
+      # --- Vérification cohérence TYPE_STATION programme_annuel → calendrier ----
+      
+      # Types présents dans programme_annuel
+      types_prog <- unique(trimws(rv$prog$type_station))
+      
+      # Types présents dans calendrier
+      types_cal <- unique(trimws(rv$cal$type_station))
+      
+      # Tous les type_station du programme_annuel doivent être présents dans calendrier
+      missing_types_from_cal <- setdiff(types_prog, types_cal)
+      
+      if (length(missing_types_from_cal) > 0) {
+        issues <- c(
+          issues,
+          paste0(
+            "Incohérence : les type_station suivants apparaissent dans 'programme_annuel' ",
+            "mais ne figurent dans aucune ligne de l'onglet 'calendrier' : ",
+            paste(missing_types_from_cal, collapse = ", ")
+          )
+        )
+      }
+      
+      # --- Cohérence programmes pour les type_station réellement utilisés ----
+      
+      # 1) Type_station réellement utilisés dans programme_annuel
+      types_utilises <- unique(trimws(rv$prog$type_station))
+      types_utilises <- types_utilises[types_utilises != "" & !is.na(types_utilises)]
+      
+      # 2) On limite le calendrier uniquement aux types_station utilisés
+      #   (ce qui évite que des programmes "hors périmètre annuel" soient contrôlés)
+      cal_reel <- rv$cal[
+        trimws(rv$cal$type_station) %in% types_utilises,
+        ,
+        drop = FALSE
+      ]
+      
+      # 3) Extraction des programmes uniquement sur ces types_station
+      prog_cal_reel <- unique(trimws(cal_reel$programme))
+      prog_cal_reel <- prog_cal_reel[prog_cal_reel != "" & !is.na(prog_cal_reel)]
+      
+      # 4) Programmes existants dans programmes_types
+      prog_types <- unique(trimws(rv$prog_types$programme))
+      
+      # 5) Programmes existants dans le BPU
+      prog_bpu <- unique(trimws(rv$bpu$label_prestation))
+      
+      # --- Vérification manquants dans programmes_types
+      missing_prog_types <- setdiff(prog_cal_reel, prog_types)
+      missing_prog_types <- setdiff(missing_prog_types, prog_sans_analyses)
+      
+      if (length(missing_prog_types) > 0) {
+        issues <- c(
+          issues,
+          paste0(
+            "Les programmes suivants sont utilisés dans le calendrier pour des type_station ",
+            "présents dans 'programme_annuel', mais n'existent pas dans 'programmes_types' : ",
+            paste(missing_prog_types, collapse = ", ")
+          )
+        )
+      }
+      
+      # --- Vérification manquants dans le BPU
+      missing_prog_bpu <- setdiff(prog_cal_reel, prog_bpu)
+      
+      if (length(missing_prog_bpu) > 0) {
+        issues <- c(
+          issues,
+          paste0(
+            "Les programmes suivants sont utilisés dans le calendrier pour des type_station ",
+            "présents dans 'programme_annuel', mais ne figurent pas dans 'label_prestation' du BPU : ",
+            paste(missing_prog_bpu, collapse = ", ")
+          )
+        )
       }
       
       # Bilan conformité
@@ -310,10 +444,7 @@ mod_import_prog_annuelle_server <- function(id, pool, schema_sqe = "sqe") {
     })
     
     # --- Écraser + importer ----------------------------------------------------
-    observeEvent(input$btn_ecraser_et_importer, {
-      shinyjs::hide("zone_btn_importer")
-      shinyjs::hide("zone_btn_ecraser")
-      
+
       
       observeEvent(input$btn_ecraser_et_importer, {
         
@@ -333,8 +464,10 @@ mod_import_prog_annuelle_server <- function(id, pool, schema_sqe = "sqe") {
           
           tryCatch({
             
+            progress_bar<-0.1
+            
             # Étape 0 : liste BCO
-            incProgress(0.10, detail="Repérage des BCO…")
+            incProgress(progress_bar, detail="Repérage des BCO…")
             sql_bco <- glue::glue_sql("
             SELECT DISTINCT bcp.bcp_bco_id AS bco_id
             FROM {`schema_sqe`}.t_boncommande_pgm_bcp bcp
@@ -346,64 +479,98 @@ mod_import_prog_annuelle_server <- function(id, pool, schema_sqe = "sqe") {
           ", .con = conn)
             bco_ids <- DBI::dbGetQuery(conn, sql_bco)$bco_id |> unique()
             
-            # Étape 1 : BCP
-            if (length(bco_ids)>0) {
-              incProgress(0.25, detail="Suppression BCP…")
-              sql1 <- glue::glue_sql("
-              DELETE FROM {`schema_sqe`}.t_boncommande_pgm_bcp
-              WHERE bcp_bco_id IN ({bco_ids*});
-            ", .con = conn)
-              DBI::dbExecute(conn, sql1)
+            print(bco_ids)
+            
+            
+            # 2) Purge des tables dépendantes de BCO
+            tables_bco <- list(
+              "t_boncommande_quantitatif_bcq" = "bcq_bco_id",
+              "t_resultat_res"                = "res_bco_id",
+              "t_boncommande_pgm_bcp"         = "bcp_bco_id",
+              "t_resultatanalyse_rea"         = "res_bco_id",
+              "t_resultatoperation_reo"       = "res_bco_id",
+              "t_resultatcondenvir_rec"       = "res_bco_id",
+              "t_resultatcondreceptechantillon_ree" = "res_bco_id",
+              "t_boncommande_bco"= "bco_id"
+                )
+            
+
+            for (tbl in names(tables_bco)) {
+              progress_bar<-progress_bar+0.1
+              incProgress(progress_bar, detail=paste0("Suppression des données dans "),tbl)
+              col <- tables_bco[[tbl]]
+              # Si aucun BCO → on saute le delete proprement
+              if (length(bco_ids) > 0) {
+                
+                sql_delete <- glue::glue_sql(
+                  "DELETE FROM sqe.{`tbl`} WHERE {`col`} IN ({vals*})",
+                  vals = bco_ids,
+                  .con = conn
+                )
+                
+                dbExecute(conn, sql_delete)
+              }
+              rv$log <- c(rv$log, glue::glue("[{Sys.time()}] Purge {tbl} OK"))
             }
             
-            # Étape 2 : REA
-            if (length(bco_ids)>0) {
-              incProgress(0.40, detail="Suppression REA…")
-              sql2 <- glue::glue_sql("
-              DELETE FROM {`schema_sqe`}.t_resultatanalyse_rea
-              WHERE res_bco_id IN ({bco_ids*});
-            ", .con = conn)
-              DBI::dbExecute(conn, sql2)
-            }
             
-            # Étape 3 : CAL
-            incProgress(0.55, detail="Suppression CAL…")
-            sql3 <- glue::glue_sql("
-            DELETE FROM {`schema_sqe`}.t_calendrierprog_cal
-            WHERE cal_mar_id = {mar}
-              AND cal_date   >= {start_dt}
-              AND cal_date   <  {end_dt};
-          ", .con = conn)
-            DBI::dbExecute(conn, sql3)
+            # 3) Purge du calendrier & programme annuel (marche + année)
+            req_cal <- glue::glue_sql("
+    DELETE FROM sqe.t_calendrierprog_cal
+    WHERE cal_mar_id = {mar}
+    AND cal_refannee = {as.character(an)};
+", .con = conn)
             
-            # Étape 4 : PGA
-            incProgress(0.70, detail="Suppression PGA…")
-            sql4 <- glue::glue_sql("
-            DELETE FROM {`schema_sqe`}.t_progannuelle_pga
-            WHERE pga_mar_id = {mar}
-              AND pga_cal_refannee = {as.character(an)};
-          ", .con = conn)
-            DBI::dbExecute(conn, sql4)
+            req_pga <- glue::glue_sql("
+    DELETE FROM sqe.t_progannuelle_pga
+    WHERE pga_mar_id = {mar}
+    AND pga_cal_refannee = {as.character(an)};
+", .con = conn)
             
-            # Étape 5 : RESULTAT_RES
-            if (length(bco_ids)>0) {
-              incProgress(0.82, detail="Suppression RESULTAT_RES…")
-              sql5 <- glue::glue_sql("
-              DELETE FROM {`schema_sqe`}.t_resultat_res
-              WHERE res_bco_id IN ({bco_ids*});
-            ", .con = conn)
-              DBI::dbExecute(conn, sql5)
-            }
             
-            # Étape 6 : BCO
-            if (length(bco_ids)>0) {
-              incProgress(0.90, detail="Suppression BCO…")
-              sql6 <- glue::glue_sql("
-              DELETE FROM {`schema_sqe`}.t_boncommande_bco
-              WHERE bco_id IN ({bco_ids*});
-            ", .con = conn)
-              DBI::dbExecute(conn, sql6)
-            }
+            
+            progress_bar<-progress_bar+0.1
+            incProgress(progress_bar, detail=paste0("Suppression des données dans t_calendrierprog_cal"))
+            
+            dbExecute(conn, req_cal)
+            rv$log <- c(rv$log, glue::glue("[{Sys.time()}] Purge calendrier OK"))
+            
+            progress_bar<-progress_bar+0.1
+            incProgress(progress_bar, detail=paste0("Suppression des données dans t_progannuelle_pga"))
+            
+            dbExecute(conn, req_pga)
+            rv$log <- c(rv$log, glue::glue("[{Sys.time()}] Purge programme annuel OK"))
+            
+            
+            # # 4) Purge des tables TEMP (clean complet)
+            # 
+            # tables_temp <- c(
+            #   "t_boncommande_bco_temp",
+            #   "t_boncommande_pgm_bcp_temp",
+            #   "t_boncommande_quantitatif_bcq_temp",
+            #   "t_calendrierprog_cal_temp",
+            #   "t_parametreprogrammetype_ppt_temp",
+            #   "t_prestation_prs_temp",
+            #   "t_prestation_id_temp",
+            #   "t_prixunitaire_pru_temp",
+            #   "t_prixunitaireprestation_prp_temp",
+            #   "t_prixunitairerunanalytique_prr_temp",
+            #   "t_progannuelle_pga_temp",
+            #   "t_resultatanalyse_rea_temp",
+            #   "t_runanalytique_run_temp"
+            # )
+            # 
+            # for (tbl in tables_temp) {
+            #   dbExecute(conn, glue::glue("TRUNCATE temp.{tbl};"))
+            #   rv$log <- c(rv$log, glue::glue("[{Sys.time()}] TRUNCATE temp.{tbl} OK"))
+            # }
+            
+            showNotification(
+              glue::glue("Purge terminée : {length(bco_ids)} bons de commande nettoyés."),
+              type = "message"
+            )
+            
+            
             
             # Import final
             incProgress(0.95, detail="Import…")
@@ -425,9 +592,7 @@ mod_import_prog_annuelle_server <- function(id, pool, schema_sqe = "sqe") {
             showNotification(paste("Erreur :", e$message), type="error")
           })
         })
-      })
-      
-      
+ 
       showNotification("Écrasement + import OK")
     })
     

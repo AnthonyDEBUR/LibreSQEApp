@@ -38,17 +38,17 @@ mod_import_prog_annuelle_ui <- function(id) {
           )
         ),
         
-        shinyjs::hidden(
-          div(
-            id = ns("zone_btn_importer"),
-            actionButton(
-              ns("btn_importer"),
-              "Importer",
-              icon = icon("cloud-arrow-up"),
-              class = "btn-primary"
-            )
-          )
-        ),
+        # shinyjs::hidden(
+        #   div(
+        #     id = ns("zone_btn_importer"),
+        #     actionButton(
+        #       ns("btn_importer"),
+        #       "Importer",
+        #       icon = icon("cloud-arrow-up"),
+        #       class = "btn-primary"
+        #     )
+        #   )
+        # ),
         
         shinyjs::hidden(
           div(
