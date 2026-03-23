@@ -58,6 +58,11 @@ onStop(function() {
 
 
 ##### Chargement des modules #####
+
+# LIVRABLES - import xml
+source("modules/mod_import_livrable_ui.R", local = TRUE)
+source("modules/mod_import_livrable_server.R", local = TRUE)
+
 # MARCHES - gestion des marchés
 source("modules/mod_edition_marche_ui.R", local = TRUE)
 source("modules/mod_edition_marche_server.R", local = TRUE)
@@ -92,6 +97,10 @@ source("modules/mod_prestataires_server.R", local = TRUE)
 # REFERENTIELS - PERIMETRES DE GESTION
 source("modules/mod_perimetres_ui.R",     local = TRUE)
 source("modules/mod_perimetres_server.R", local = TRUE)
+
+##### Chargement des fonctions métier #####
+source("functions/function_test_xml.R")
+
 
 
 
@@ -324,48 +333,8 @@ ui <- navbarPage(
   navbarMenu(
     "Livrables",
     tabPanel(
-      "Déposer un fichier xml / QUESU / EDILABO",
-      selectInput(
-        "livr_select_bdc_1",
-        "Sélectionnez le bon de commande concerné",
-        choices = c(
-          "2022-3_UGVO_pluie_avril_2022",
-          "2022-3_UGVO_calendaire_avril_2022"
-        )
-      ),
-      selectInput(
-        "select_prestataire_emetteur_xml",
-        "Emetteur xml",
-        choices = c(
-          "Prestataire en charge du marché 1",
-          "Prestataire en charge du marché 2"
-        )
-      ),
-      selectInput("select_mois",
-                  "provisoire : mois à afficher",
-                  choices = c(unique(
-                    prog_previsionnelle$mois
-                  ))),
-      selectInput(
-        "select_rattachement",
-        "provisoire : rattachement devis",
-        choices = c(unique(prog_previsionnelle$rattachement_devis))
-      ),
-      selectInput(
-        "livr_select_perimetre_fact",
-        "provisoire : perimetre facturation",
-        choices = c(unique(
-          prog_previsionnelle$perimetre_facturation
-        ))
-      ),
-      fileInput("import_xml",
-                label = "Sélectionner fichier xml de résultats"),
-      actionButton("btn_import_xml", "Déposer le fichier sélectionné sur le serveur"),
-      actionButton("btn_actualise_bdc", "Actualiser traitement avec nlle réference bon de commande"),
-      p(
-        "formats acceptés : EDILABO, QUESU v2, QUESU v3, QUESU v3.1.
-               Une fois importé le fichier fait l'objet des scripts de tests"
-      )
+      "Vérifier un fichier livrable",
+      mod_import_livrable_ui("import_livrable")
     ),
     tabPanel(
       "Rapport de dépôt",
@@ -781,6 +750,13 @@ ui <- navbarPage(
 server <- function(input, output) {
 
     
+##### LIVRABLES #####
+  mod_import_livrable_server("import_livrable", 
+                             pool = connexion)
+
+  
+  
+  
 
   ##### MARCHES #####
 # edition des marchés  
