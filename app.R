@@ -102,8 +102,6 @@ source("modules/mod_perimetres_server.R", local = TRUE)
 source("functions/function_test_xml.R")
 
 
-
-
 # temporaire
 
 tableau_per_gest <-

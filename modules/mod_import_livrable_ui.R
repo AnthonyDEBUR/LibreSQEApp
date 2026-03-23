@@ -7,13 +7,13 @@ mod_import_livrable_ui <- function(id) {
     fluidRow(
       column(
         4,
-        # 🔵 Sélection du marché (nouveau)
+        # Sélection du marché 
         selectInput(
           ns("marche"), "Sélectionnez le marché",
           choices = NULL
         ),
         
-        # 🔵 Liste filtrée des BDC
+        # Liste filtrée des BDC
         selectInput(
           ns("bco"), "Sélectionnez le bon de commande",
           choices = NULL
@@ -25,7 +25,9 @@ mod_import_livrable_ui <- function(id) {
         ),
         actionButton(ns("lancer_test"), "Tester la conformité", icon = icon("check")),
         hr(),
-        downloadButton(ns("dl_rapport"), "Télécharger rapport .xlsx")
+        downloadButton(ns("dl_rapport"), "Télécharger rapport .xlsx"),
+        hr(),
+        downloadButton(ns("download_donnees"), "Télécharger les données")
       ),
       
       column(

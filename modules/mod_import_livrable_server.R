@@ -4,7 +4,7 @@ mod_import_livrable_server <- function(id, pool) {
     ns <- session$ns
     
     # -------------------------------------------
-    # 🔵 1. Charger la liste des marchés
+    # 1. Charger la liste des marchés
     # -------------------------------------------
     observe({
       req(pool)
@@ -19,7 +19,7 @@ mod_import_livrable_server <- function(id, pool) {
     
     
     # -------------------------------------------
-    # 🔵 2. Charger la liste filtrée des BDC selon marché
+    # 2. Charger la liste filtrée des BDC selon marché
     # -------------------------------------------
     observeEvent(input$marche, {
       req(input$marche)
@@ -41,7 +41,7 @@ mod_import_livrable_server <- function(id, pool) {
     
     
     # -------------------------------------------
-    # 🔵 3. Lancer le test
+    # 3. Lancer le test
     # -------------------------------------------
     resultats <- reactiveVal(NULL)
     
@@ -80,7 +80,7 @@ mod_import_livrable_server <- function(id, pool) {
     
     
     # -------------------------------------------
-    # 🔵 4. Résumé
+    # 4. Résumé
     # -------------------------------------------
     output$resume <- renderPrint({
       req(resultats())
@@ -94,7 +94,7 @@ mod_import_livrable_server <- function(id, pool) {
     
     
     # -------------------------------------------
-    # 🔵 5. Construction dynamique des onglets
+    # 5. Construction dynamique des onglets
     # -------------------------------------------
     output$ui_nonconf <- renderUI({
       req(resultats())
@@ -109,7 +109,7 @@ mod_import_livrable_server <- function(id, pool) {
         }
       })
       
-      do.call(tabsetPanel, onglets)
+        do.call(tabsetPanel, onglets)
     })
     
     
@@ -122,7 +122,10 @@ mod_import_livrable_server <- function(id, pool) {
           local({
             nom_loc <- nom
             output[[paste0("tbl_", nom_loc)]] <- DT::renderDataTable({
-              DT::datatable(r[[nom_loc]], options = list(pageLength = 10))
+              DT::datatable(r[[nom_loc]], 
+                            options = list(pageLength = 10,
+                                          autoWidth = TRUE),
+                            filter = "top")
             })
           })
         }
@@ -131,23 +134,46 @@ mod_import_livrable_server <- function(id, pool) {
     
     
     # -------------------------------------------
-    # 🔵 6. Table analyses
+    # 6. Table analyses
     # -------------------------------------------
+    # output$table_analyses <- DT::renderDataTable({
+    #   req(resultats())
+    #   DT::datatable(resultats()$Analyses, options = list(pageLength = 10))
+    # })
+    
     output$table_analyses <- DT::renderDataTable({
       req(resultats())
-      DT::datatable(resultats()$Analyses, options = list(pageLength = 10))
+      DT::datatable(
+        resultats()$Analyses,
+        options = list(
+          pageLength = 10,
+          dom = "ltipr",
+          searchHighlight = TRUE,
+          autoWidth = TRUE,
+          filter = "top"
+        )
+      )
     })
     
-    
     # -------------------------------------------
-    # 🔵 7. Export Excel
+    # 7. Export Excel
     # -------------------------------------------
     output$dl_rapport <- downloadHandler(
       filename = function() {
-        paste0("Rapport_", Sys.Date(), ".xlsx")
+        req(resultats())
+        
+        # Récupération du nom du bon de commande
+        nom_bco <- resultats()$Rapport$bon_de_commande
+        
+        # Nettoyage éventuel du nom
+        nom_bco <- gsub("[^A-Za-z0-9_-]", "_", nom_bco)
+        
+        paste0(nom_bco, "_rapport.xlsx")
       },
       content = function(file) {
+        req(resultats())
         r <- resultats()$Rapport
+        
         wb <- openxlsx::createWorkbook()
         
         for (i in names(r)) {
@@ -158,6 +184,25 @@ mod_import_livrable_server <- function(id, pool) {
         }
         
         openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
+      }
+    )
+    
+    ##### Téléchargement des données brutes #####
+    output$download_donnees <- downloadHandler(
+      filename = function() {
+        req(resultats())
+        
+        # Récupération du nom du bon de commande depuis les résultats
+        nom_bco <- resultats()$Rapport$bon_de_commande
+        
+        # Nettoyage éventuel (accents, espaces)
+        nom_bco <- gsub("[^A-Za-z0-9_-]", "_", nom_bco)
+        
+        paste0(nom_bco, "_data.xlsx")
+      },
+      content = function(file) {
+        req(resultats())
+        openxlsx::write.xlsx(resultats()$Analyses, file, overwrite = TRUE)
       }
     )
     
